@@ -1,8 +1,8 @@
 use evdev::{uinput::VirtualDeviceBuilder, AttributeSet, EventType, InputEvent, RelativeAxisType, Key};
-use futures::{StreamExt, SinkExt, TryStreamExt};
+use futures::{StreamExt, SinkExt};
 use serde::{Deserialize, Serialize};
 use std::sync::{Arc, Mutex};
-use warp::{ws::Message, Filter, multipart::{FormData, Part}};
+use warp::{ws::Message, Filter, multipart::FormData};
 use tokio::sync::broadcast;
 use std::collections::HashMap;
 use tokio::fs;
@@ -276,13 +276,12 @@ async fn handle_websocket(
 }
 
 async fn handle_upload(
-    form: FormData,
+    mut form: FormData,
     file_storage: FileStorage,
     clipboard_tx: broadcast::Sender<ClipboardItem>,
 ) -> Result<impl warp::Reply, warp::Rejection> {
-    let parts: Vec<Part> = form.try_collect().await.unwrap_or_default();
-    
-    for mut part in parts {
+    // Process parts as they arrive, don't collect into memory
+    while let Some(Ok(mut part)) = form.next().await {
         if part.name() == "file" {
             let filename = part.filename().unwrap_or("unnamed").to_string();
             let id = Uuid::new_v4().to_string();
@@ -291,22 +290,44 @@ async fn handle_upload(
                 .unwrap()
                 .as_secs();
             
+            println!("📤 Starting upload: {}", filename);
+            
             // Create uploads directory if it doesn't exist
             fs::create_dir_all("./uploads").await.ok();
             
             let file_path = format!("./uploads/{}", id);
             let mut file = fs::File::create(&file_path).await.unwrap();
             
-            // Collect file data
-            let mut data = Vec::new();
-            while let Some(buf) = part.data().await {
-                if let Ok(chunk) = buf {
-                    data.extend_from_slice(chunk.chunk());
+            // Stream file data directly to disk as it arrives
+            let mut size = 0u64;
+            let mut last_log = 0u64;
+            while let Some(content) = part.data().await {
+                match content {
+                    Ok(chunk) => {
+                        let bytes = chunk.chunk();
+                        file.write_all(bytes).await.unwrap();
+                        size += bytes.len() as u64;
+                        
+                        // Log progress every 100KB
+                        if size - last_log > 100_000 {
+                            println!("  Progress: {} KB", size / 1024);
+                            last_log = size;
+                        }
+                    }
+                    Err(e) => {
+                        eprintln!("❌ Error reading chunk: {}", e);
+                        return Ok(warp::reply::json(&serde_json::json!({
+                            "error": "Upload failed"
+                        })));
+                    }
                 }
             }
             
-            let size = data.len() as u64;
-            file.write_all(&data).await.unwrap();
+            // Ensure all data is written to disk
+            file.flush().await.unwrap();
+            drop(file);
+            
+            println!("✅ Upload complete: {} ({} KB)", filename, size / 1024);
             
             let file_info = FileInfo {
                 id: id.clone(),
@@ -421,6 +442,12 @@ async fn main() {
     let clipboard_js_route = warp::path("clipboard.js")
         .and(warp::fs::file("./static/clipboard.js"));
     
+    let files_html_route = warp::path("files.html")
+        .and(warp::fs::file("./static/files.html"));
+    
+    let files_js_route = warp::path("files.js")
+        .and(warp::fs::file("./static/files.js"));
+    
     let static_route = warp::path("static")
         .and(warp::fs::dir("./static"));
     
@@ -429,7 +456,8 @@ async fn main() {
     let clipboard_tx_upload = clipboard_tx.clone();
     let upload_route = warp::path("upload")
         .and(warp::post())
-        .and(warp::multipart::form().max_length(50_000_000)) // 50MB max
+        .and(warp::body::content_length_limit(1_073_741_824)) // 1 GiB body limit
+        .and(warp::multipart::form().max_length(1_073_741_824)) // 1 GiB max
         .and(warp::any().map(move || file_storage_upload.clone()))
         .and(warp::any().map(move || clipboard_tx_upload.clone()))
         .and_then(handle_upload);
@@ -476,6 +504,8 @@ async fn main() {
         .or(css_route)
         .or(js_route)
         .or(clipboard_js_route)
+        .or(files_html_route)
+        .or(files_js_route)
         .or(static_route)
         .or(upload_route)
         .or(files_route)

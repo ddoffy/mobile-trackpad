@@ -310,10 +310,17 @@ body {
 
 /* Upload Progress */
 .upload-progress {
-    color: rgba(255, 255, 255, 0.9);
-    font-size: 14px;
-    margin-top: 10px;
+    margin-top: 15px;
     min-height: 20px;
-    text-align: center;
+}
+
+.upload-progress-item {
+    background: rgba(255, 255, 255, 0.15);
+    padding: 12px;
+    border-radius: 8px;
+    margin-bottom: 10px;
+    color: rgba(255, 255, 255, 0.95);
+    font-size: 13px;
+    backdrop-filter: blur(10px);
 }
 

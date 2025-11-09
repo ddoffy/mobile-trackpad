@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>File Sharing</title>
+    <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+    <div class="header">
+        <h1>📁 File Sharing</h1>
+        <div class="status" id="status">Connecting...</div>
+        <nav class="nav">
+            <a href="/" class="nav-link">Trackpad</a>
+            <a href="/clipboard.html" class="nav-link">Clipboard</a>
+            <a href="/files.html" class="nav-link active">Files</a>
+        </nav>
+    </div>
+    
+    <div class="clipboard-container">
+        <div class="clipboard-section">
+            <h2>📤 Upload Files</h2>
+            <div class="clipboard-info">Files are stored for 1 hour and can be downloaded on any device</div>
+            <input type="file" id="fileInput" style="display: none;" multiple>
+            <button class="btn btn-primary" id="uploadBtn">📁 Choose Files</button>
+            <div id="uploadProgress" class="upload-progress"></div>
+        </div>
+        
+        <div class="clipboard-section">
+            <h2>📥 Available Files</h2>
+            <div class="clipboard-info">Files uploaded in the last hour (max 1 GiB per file)</div>
+            <div id="fileList" class="history-list"></div>
+        </div>
+    </div>
+
+    <script src="/files.js"></script>
+</body>
+</html>

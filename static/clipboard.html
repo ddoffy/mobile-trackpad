@@ -13,6 +13,7 @@
         <nav class="nav">
             <a href="/" class="nav-link">Trackpad</a>
             <a href="/clipboard.html" class="nav-link active">Clipboard</a>
+            <a href="/files.html" class="nav-link">Files</a>
         </nav>
     </div>
     
@@ -24,23 +25,9 @@
         </div>
         
         <div class="clipboard-section">
-            <h2>� Upload File</h2>
-            <div class="clipboard-info">Files are stored for 1 hour and can be downloaded on any device</div>
-            <input type="file" id="fileInput" style="display: none;" multiple>
-            <button class="btn btn-secondary" id="uploadBtn">📁 Choose Files</button>
-            <div id="uploadProgress" class="upload-progress"></div>
-        </div>
-        
-        <div class="clipboard-section">
-            <h2>�📜 Clipboard History</h2>
+            <h2>📜 Clipboard History</h2>
             <div class="clipboard-info">All broadcasted clipboard items from all connected sessions appear here. Click Copy to copy to your device's clipboard.</div>
             <div id="historyList" class="history-list"></div>
-        </div>
-        
-        <div class="clipboard-section">
-            <h2>📥 Available Files</h2>
-            <div class="clipboard-info">Files uploaded in the last hour</div>
-            <div id="fileList" class="history-list"></div>
         </div>
     </div>
 
