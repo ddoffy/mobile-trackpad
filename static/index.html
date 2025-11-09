@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Mobile Trackpad</title>
+    <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+    <div class="header">
+        <h1>📱 Mobile Trackpad</h1>
+        <div class="status" id="status">Connecting...</div>
+    </div>
+    
+    <div class="controls-container">
+        <div class="trackpad-section">
+            <div class="trackpad" id="trackpad">
+                <div class="trackpad-hint">👆 Tap: click | Hold: drag<br>✌️ Move: scroll | Swipe ←→: back/forward | Tap: right-click</div>
+            </div>
+            <div class="buttons">
+                <button class="btn btn-left" id="leftBtn">Left Click</button>
+                <button class="btn btn-right" id="rightBtn">Right Click</button>
+            </div>
+        </div>
+        
+        <div class="arrow-keys">
+            <div class="arrow-row">
+                <button class="arrow-btn" id="arrowUp">▲</button>
+            </div>
+            <div class="arrow-row">
+                <button class="arrow-btn" id="arrowLeft">◄</button>
+                <button class="arrow-btn" id="arrowDown">▼</button>
+                <button class="arrow-btn" id="arrowRight">►</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="/script.js"></script>
+</body>
+</html>

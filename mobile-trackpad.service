@@ -1,0 +1,15 @@
+[Unit]
+Description=Mobile Trackpad WebSocket Service
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/home/doffy/workspace/rust/mobile-trackpad/target/release/mobile-trackpad
+WorkingDirectory=/home/doffy/workspace/rust/mobile-trackpad
+Restart=on-failure
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=default.target

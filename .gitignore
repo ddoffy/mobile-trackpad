@@ -1,0 +1,42 @@
+# Rust/Cargo
+/target/
+**/*.rs.bk
+*.pdb
+Cargo.lock
+
+# Build artifacts
+debug/
+target/
+release/
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Rust-specific
+**/*.rs.bk
+*.pdb
+
+# System files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Backup files
+*~
+*.bak
+*.tmp
+
+# Environment variables
+.env
+.env.local
+
+# Test coverage
+*.profraw
+*.profdata
