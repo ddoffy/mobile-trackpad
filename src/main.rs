@@ -1,9 +1,14 @@
 use evdev::{uinput::VirtualDeviceBuilder, AttributeSet, EventType, InputEvent, RelativeAxisType, Key};
-use futures::{StreamExt, SinkExt};
+use futures::{StreamExt, SinkExt, TryStreamExt};
 use serde::{Deserialize, Serialize};
 use std::sync::{Arc, Mutex};
-use warp::{ws::Message, Filter};
+use warp::{ws::Message, Filter, multipart::{FormData, Part}};
 use tokio::sync::broadcast;
+use std::collections::HashMap;
+use tokio::fs;
+use tokio::io::AsyncWriteExt;
+use bytes::Buf;
+use uuid::Uuid;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type")]
@@ -32,6 +37,16 @@ struct ClipboardItem {
     timestamp: u64,
     source: String,
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct FileInfo {
+    id: String,
+    filename: String,
+    size: u64,
+    uploaded_at: u64,
+}
+
+type FileStorage = Arc<Mutex<HashMap<String, FileInfo>>>;
 
 struct MouseController {
     device: Arc<Mutex<evdev::uinput::VirtualDevice>>,
@@ -260,6 +275,91 @@ async fn handle_websocket(
     }
 }
 
+async fn handle_upload(
+    form: FormData,
+    file_storage: FileStorage,
+    clipboard_tx: broadcast::Sender<ClipboardItem>,
+) -> Result<impl warp::Reply, warp::Rejection> {
+    let parts: Vec<Part> = form.try_collect().await.unwrap_or_default();
+    
+    for mut part in parts {
+        if part.name() == "file" {
+            let filename = part.filename().unwrap_or("unnamed").to_string();
+            let id = Uuid::new_v4().to_string();
+            let uploaded_at = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_secs();
+            
+            // Create uploads directory if it doesn't exist
+            fs::create_dir_all("./uploads").await.ok();
+            
+            let file_path = format!("./uploads/{}", id);
+            let mut file = fs::File::create(&file_path).await.unwrap();
+            
+            // Collect file data
+            let mut data = Vec::new();
+            while let Some(buf) = part.data().await {
+                if let Ok(chunk) = buf {
+                    data.extend_from_slice(chunk.chunk());
+                }
+            }
+            
+            let size = data.len() as u64;
+            file.write_all(&data).await.unwrap();
+            
+            let file_info = FileInfo {
+                id: id.clone(),
+                filename: filename.clone(),
+                size,
+                uploaded_at,
+            };
+            
+            file_storage.lock().unwrap().insert(id.clone(), file_info.clone());
+            
+            // Notify all clients
+            let _ = clipboard_tx.send(ClipboardItem {
+                content: format!("File uploaded: {}", filename),
+                timestamp: uploaded_at,
+                source: "System".to_string(),
+            });
+            
+            return Ok(warp::reply::json(&serde_json::json!({
+                "id": id,
+                "filename": filename
+            })));
+        }
+    }
+    
+    Ok(warp::reply::json(&serde_json::json!({"error": "No file uploaded"})))
+}
+
+async fn cleanup_old_files(file_storage: FileStorage) {
+    loop {
+        tokio::time::sleep(tokio::time::Duration::from_secs(60)).await;
+        
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
+        
+        let expired: Vec<String> = {
+            let storage = file_storage.lock().unwrap();
+            storage
+                .iter()
+                .filter(|(_, info)| now - info.uploaded_at > 3600)
+                .map(|(id, _)| id.clone())
+                .collect()
+        };
+        
+        for id in expired {
+            file_storage.lock().unwrap().remove(&id);
+            let file_path = format!("./uploads/{}", id);
+            fs::remove_file(file_path).await.ok();
+        }
+    }
+}
+
 #[tokio::main]
 async fn main() {
     println!("🚀 Starting Mobile Trackpad Service...");
@@ -269,6 +369,15 @@ async fn main() {
             .expect("Failed to create mouse controller. Make sure /dev/uinput is accessible.")
     );
     println!("✓ Mouse controller initialized (using evdev/uinput for Wayland)");
+
+    // Create file storage
+    let file_storage: FileStorage = Arc::new(Mutex::new(HashMap::new()));
+    
+    // Spawn cleanup task
+    let file_storage_cleanup = file_storage.clone();
+    tokio::spawn(async move {
+        cleanup_old_files(file_storage_cleanup).await;
+    });
 
     // Create broadcast channel for clipboard events
     let (clipboard_tx, _) = broadcast::channel::<ClipboardItem>(100);
@@ -287,12 +396,13 @@ async fn main() {
     println!("\n⏹️  Press Ctrl+C to stop");
 
     let mouse_controller = Arc::clone(&mouse_controller);
+    let clipboard_tx_ws = clipboard_tx.clone();
 
     let ws_route = warp::path("ws")
         .and(warp::ws())
         .map(move |ws: warp::ws::Ws| {
             let mouse_controller = Arc::clone(&mouse_controller);
-            let clipboard_tx = clipboard_tx.clone();
+            let clipboard_tx = clipboard_tx_ws.clone();
             ws.on_upgrade(move |socket| handle_websocket(socket, mouse_controller, clipboard_tx))
         });
 
@@ -313,6 +423,53 @@ async fn main() {
     
     let static_route = warp::path("static")
         .and(warp::fs::dir("./static"));
+    
+    // File upload route
+    let file_storage_upload = file_storage.clone();
+    let clipboard_tx_upload = clipboard_tx.clone();
+    let upload_route = warp::path("upload")
+        .and(warp::post())
+        .and(warp::multipart::form().max_length(50_000_000)) // 50MB max
+        .and(warp::any().map(move || file_storage_upload.clone()))
+        .and(warp::any().map(move || clipboard_tx_upload.clone()))
+        .and_then(handle_upload);
+    
+    // File list route
+    let file_storage_list = file_storage.clone();
+    let files_route = warp::path("files")
+        .and(warp::get())
+        .map(move || {
+            let storage = file_storage_list.lock().unwrap();
+            let files: Vec<FileInfo> = storage.values().cloned().collect();
+            warp::reply::json(&files)
+        });
+    
+    // File download route
+    let file_storage_download = file_storage.clone();
+    let download_route = warp::path("download")
+        .and(warp::path::param::<String>())
+        .and(warp::get())
+        .and(warp::any().map(move || file_storage_download.clone()))
+        .and_then(|file_id: String, storage: FileStorage| async move {
+            let file_info = storage.lock().unwrap().get(&file_id).cloned();
+            
+            if let Some(info) = file_info {
+                let file_path = format!("./uploads/{}", file_id);
+                let file_data = fs::read(&file_path).await.map_err(|_| warp::reject::not_found())?;
+                
+                Ok::<_, warp::Rejection>(warp::reply::with_header(
+                    warp::reply::with_header(
+                        file_data,
+                        "Content-Type",
+                        "application/octet-stream"
+                    ),
+                    "Content-Disposition",
+                    format!("attachment; filename=\"{}\"", info.filename)
+                ))
+            } else {
+                Err(warp::reject::not_found())
+            }
+        });
 
     let routes = html_route
         .or(clipboard_route)
@@ -320,6 +477,9 @@ async fn main() {
         .or(js_route)
         .or(clipboard_js_route)
         .or(static_route)
+        .or(upload_route)
+        .or(files_route)
+        .or(download_route)
         .or(ws_route);
 
     warp::serve(routes)

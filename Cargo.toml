@@ -13,3 +13,5 @@ tokio-stream = "0.1"
 evdev = "0.12"
 local-ip-address = "0.5"
 arboard = "3.4"
+bytes = "1.5"
+uuid = { version = "1.6", features = ["v4"] }
