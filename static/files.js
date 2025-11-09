@@ -26,6 +26,7 @@ ws.onmessage = (event) => {
     try {
         const data = JSON.parse(event.data);
         if (data.type === 'file_uploaded') {
+            // Immediately reload file list when new file is uploaded
             loadFileList();
             showNotification('✅ File uploaded successfully!', 'success');
         }
@@ -34,10 +35,23 @@ ws.onmessage = (event) => {
     }
 };
 
+let lastFileListHash = '';
+
 async function loadFileList() {
     try {
-        const response = await fetch('/files');
+        const response = await fetch('/files', {
+            cache: 'no-store' // Prevent browser caching for fresh data
+        });
         const files = await response.json();
+        
+        // Create hash to detect changes
+        const currentHash = JSON.stringify(files.map(f => f.id + f.uploaded_at));
+        
+        // Skip update if nothing changed
+        if (currentHash === lastFileListHash && fileList.children.length > 0) {
+            return;
+        }
+        lastFileListHash = currentHash;
         
         fileList.innerHTML = '';
         
@@ -45,6 +59,9 @@ async function loadFileList() {
             fileList.innerHTML = '<div class="clipboard-info">No files available</div>';
             return;
         }
+        
+        // Use DocumentFragment for better performance
+        const fragment = document.createDocumentFragment();
         
         files.forEach(file => {
             const item = document.createElement('div');
@@ -62,10 +79,13 @@ async function loadFileList() {
                 <button class="btn btn-small" onclick="downloadFile('${file.id}', '${escapeHtml(file.filename)}')">⬇️ Download</button>
             `;
             
-            fileList.appendChild(item);
+            fragment.appendChild(item);
         });
+        
+        fileList.appendChild(fragment);
     } catch (err) {
         console.error('Failed to load file list:', err);
+        fileList.innerHTML = '<div class="clipboard-info" style="color: rgba(255,255,255,0.7);">Failed to load files. Retrying...</div>';
     }
 }
 
@@ -218,5 +238,5 @@ uploadBtn.addEventListener('click', () => {
 
 fileInput.addEventListener('change', uploadFiles);
 
-// Auto-refresh file list every 30 seconds
-setInterval(loadFileList, 30000);
+// Auto-refresh file list every 60 seconds (reduced since we have WebSocket updates)
+setInterval(loadFileList, 60000);

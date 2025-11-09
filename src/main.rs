@@ -468,8 +468,17 @@ async fn main() {
         .and(warp::get())
         .map(move || {
             let storage = file_storage_list.lock().unwrap();
-            let files: Vec<FileInfo> = storage.values().cloned().collect();
-            warp::reply::json(&files)
+            let mut files: Vec<FileInfo> = storage.values().cloned().collect();
+            
+            // Sort by upload time, newest first
+            files.sort_by(|a, b| b.uploaded_at.cmp(&a.uploaded_at));
+            
+            // Add cache control header to prevent excessive requests
+            warp::reply::with_header(
+                warp::reply::json(&files),
+                "Cache-Control",
+                "no-cache, must-revalidate"
+            )
         });
     
     // File download route
@@ -483,18 +492,47 @@ async fn main() {
             
             if let Some(info) = file_info {
                 let file_path = format!("./uploads/{}", file_id);
-                let file_data = fs::read(&file_path).await.map_err(|_| warp::reject::not_found())?;
                 
-                Ok::<_, warp::Rejection>(warp::reply::with_header(
-                    warp::reply::with_header(
-                        file_data,
-                        "Content-Type",
-                        "application/octet-stream"
-                    ),
-                    "Content-Disposition",
-                    format!("attachment; filename=\"{}\"", info.filename)
-                ))
+                // Check if file exists and get its size
+                match fs::metadata(&file_path).await {
+                    Ok(metadata) => {
+                        let file_size = metadata.len();
+                        
+                        // Read file data
+                        match fs::read(&file_path).await {
+                            Ok(file_data) => {
+                                println!("📥 Download: {} ({} bytes)", info.filename, file_size);
+                                
+                                // Return with proper headers including Content-Length
+                                Ok::<_, warp::Rejection>(
+                                    warp::reply::with_header(
+                                        warp::reply::with_header(
+                                            warp::reply::with_header(
+                                                file_data,
+                                                "Content-Type",
+                                                "application/octet-stream"
+                                            ),
+                                            "Content-Disposition",
+                                            format!("attachment; filename=\"{}\"", info.filename)
+                                        ),
+                                        "Content-Length",
+                                        file_size.to_string()
+                                    )
+                                )
+                            }
+                            Err(e) => {
+                                eprintln!("❌ Error reading file: {}", e);
+                                Err(warp::reject::not_found())
+                            }
+                        }
+                    }
+                    Err(e) => {
+                        eprintln!("❌ File not found: {}", e);
+                        Err(warp::reject::not_found())
+                    }
+                }
             } else {
+                eprintln!("❌ File ID not found in storage: {}", file_id);
                 Err(warp::reject::not_found())
             }
         });
