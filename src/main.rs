@@ -91,11 +91,12 @@ impl MouseController {
             TrackpadEvent::Scroll { dx, dy } => {
                 let mut events = Vec::new();
                 
+                // macOS-style natural scrolling: invert both directions
                 if dy.abs() > 0.1 {
                     events.push(InputEvent::new(
                         EventType::RELATIVE,
                         RelativeAxisType::REL_WHEEL.0,
-                        -(dy / 10.0) as i32,
+                        (dy / 10.0) as i32,
                     ));
                 }
                 
@@ -103,7 +104,7 @@ impl MouseController {
                     events.push(InputEvent::new(
                         EventType::RELATIVE,
                         RelativeAxisType::REL_HWHEEL.0,
-                        (dx / 10.0) as i32,
+                        -(dx / 10.0) as i32,
                     ));
                 }
                 
