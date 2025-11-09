@@ -3,7 +3,6 @@ use futures::{StreamExt, SinkExt};
 use serde::{Deserialize, Serialize};
 use std::sync::{Arc, Mutex};
 use warp::{ws::Message, Filter};
-use tokio::time::{interval, Duration};
 use tokio::sync::broadcast;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -241,7 +240,7 @@ async fn handle_websocket(
                                     .duration_since(std::time::UNIX_EPOCH)
                                     .unwrap()
                                     .as_secs(),
-                                source: "iPhone".to_string(),
+                                source: "Client".to_string(),
                             };
                             let _ = clipboard_tx.send(item);
                         } else {
@@ -273,35 +272,6 @@ async fn main() {
 
     // Create broadcast channel for clipboard events
     let (clipboard_tx, _) = broadcast::channel::<ClipboardItem>(100);
-    
-    // Spawn clipboard monitoring task
-    let clipboard_tx_monitor = clipboard_tx.clone();
-    tokio::spawn(async move {
-        let mut last_clipboard_content = String::new();
-        let mut poll_interval = interval(Duration::from_millis(1000));
-        
-        loop {
-            poll_interval.tick().await;
-            
-            if let Ok(mut clipboard) = arboard::Clipboard::new() {
-                if let Ok(content) = clipboard.get_text() {
-                    if content != last_clipboard_content && !content.is_empty() {
-                        last_clipboard_content = content.clone();
-                        
-                        let item = ClipboardItem {
-                            content,
-                            timestamp: std::time::SystemTime::now()
-                                .duration_since(std::time::UNIX_EPOCH)
-                                .unwrap()
-                                .as_secs(),
-                            source: "Linux".to_string(),
-                        };
-                        let _ = clipboard_tx_monitor.send(item);
-                    }
-                }
-            }
-        }
-    });
 
     let local_ip = local_ip_address::local_ip()
         .unwrap_or_else(|_| "0.0.0.0".parse().unwrap());

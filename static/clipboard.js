@@ -38,7 +38,7 @@ function addHistoryItem(content, timestamp, source) {
     const date = new Date(timestamp * 1000);
     const timeStr = date.toLocaleTimeString();
     
-    const icon = source === 'Linux' ? '🖥️' : '📱';
+    const icon = source === 'Client' ? '�' : '�️';
     
     const escapedContent = escapeHtml(content);
     
