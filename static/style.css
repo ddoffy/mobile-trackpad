@@ -81,10 +81,19 @@ body {
     min-width: 0;
 }
 
+.bottom-controls {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    align-items: center;
+    justify-content: center;
+}
+
 .buttons {
     display: flex;
     gap: 8px;
     justify-content: center;
+    width: 100%;
 }
 
 .arrow-keys {
