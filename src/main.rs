@@ -21,6 +21,8 @@ enum TrackpadEvent {
     Swipe { direction: String },
     #[serde(rename = "arrow_key")]
     ArrowKey { key: String },
+    #[serde(rename = "clipboard")]
+    Clipboard { content: String },
 }
 
 struct MouseController {
@@ -171,6 +173,10 @@ impl MouseController {
                     InputEvent::new(EventType::SYNCHRONIZATION, 0, 0),
                 ])?;
             }
+            TrackpadEvent::Clipboard { .. } => {
+                // Clipboard is handled separately in websocket handler
+                // This is a no-op for the mouse controller
+            }
         }
         
         Ok(())
@@ -194,8 +200,19 @@ async fn handle_websocket(
             Ok(msg) => {
                 if let Ok(text) = msg.to_str() {
                     if let Ok(event) = serde_json::from_str::<TrackpadEvent>(text) {
-                        if let Err(e) = mouse_controller.handle_event(event) {
-                            eprintln!("Error handling event: {}", e);
+                        // Handle clipboard separately
+                        if let TrackpadEvent::Clipboard { content } = &event {
+                            // Set Linux clipboard
+                            if let Ok(mut clipboard) = arboard::Clipboard::new() {
+                                if let Err(e) = clipboard.set_text(content.clone()) {
+                                    eprintln!("Error setting clipboard: {}", e);
+                                }
+                            }
+                        } else {
+                            // Handle other events through mouse controller
+                            if let Err(e) = mouse_controller.handle_event(event) {
+                                eprintln!("Error handling event: {}", e);
+                            }
                         }
                     }
                 }
@@ -243,18 +260,26 @@ async fn main() {
     let html_route = warp::path::end()
         .and(warp::fs::file("./static/index.html"));
     
+    let clipboard_route = warp::path("clipboard.html")
+        .and(warp::fs::file("./static/clipboard.html"));
+    
     let css_route = warp::path("style.css")
         .and(warp::fs::file("./static/style.css"));
     
     let js_route = warp::path("script.js")
         .and(warp::fs::file("./static/script.js"));
     
+    let clipboard_js_route = warp::path("clipboard.js")
+        .and(warp::fs::file("./static/clipboard.js"));
+    
     let static_route = warp::path("static")
         .and(warp::fs::dir("./static"));
 
     let routes = html_route
+        .or(clipboard_route)
         .or(css_route)
         .or(js_route)
+        .or(clipboard_js_route)
         .or(static_route)
         .or(ws_route);
 

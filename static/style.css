@@ -29,6 +29,34 @@ body {
     margin: 0;
 }
 
+.nav {
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+    margin-top: 10px;
+}
+
+.nav-link {
+    color: rgba(255, 255, 255, 0.7);
+    text-decoration: none;
+    padding: 8px 20px;
+    border-radius: 8px;
+    font-size: 14px;
+    transition: all 0.2s;
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.nav-link:hover {
+    background: rgba(255, 255, 255, 0.2);
+    color: white;
+}
+
+.nav-link.active {
+    background: rgba(255, 255, 255, 0.3);
+    color: white;
+    font-weight: 600;
+}
+
 .status {
     padding: 3px;
     font-size: 12px;
@@ -167,4 +195,56 @@ body {
     pointer-events: none;
     transform: translate(-50%, -50%);
     transition: opacity 0.3s;
+}
+
+/* Clipboard Page Styles */
+.clipboard-container {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    padding: 20px;
+    flex: 1;
+    overflow-y: auto;
+}
+
+.clipboard-section {
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 20px;
+    padding: 20px;
+    backdrop-filter: blur(10px);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+}
+
+.clipboard-section h2 {
+    color: white;
+    font-size: 18px;
+    margin: 0 0 15px 0;
+    text-align: center;
+}
+
+.clipboard-section textarea {
+    width: 100%;
+    min-height: 150px;
+    padding: 15px;
+    border: none;
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.9);
+    font-size: 16px;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    resize: vertical;
+    margin-bottom: 15px;
+}
+
+.clipboard-section textarea:focus {
+    outline: 2px solid rgba(59, 130, 246, 0.8);
+}
+
+.btn-primary {
+    background: rgba(34, 197, 94, 0.6);
+    width: 100%;
+}
+
+.btn-secondary {
+    background: rgba(59, 130, 246, 0.6);
+    width: 100%;
 }

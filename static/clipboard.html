@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Clipboard Sync</title>
+    <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+    <div class="header">
+        <h1>📋 Clipboard Sync</h1>
+        <div class="status" id="status">Connecting...</div>
+        <nav class="nav">
+            <a href="/" class="nav-link">Trackpad</a>
+            <a href="/clipboard.html" class="nav-link active">Clipboard</a>
+        </nav>
+    </div>
+    
+    <div class="clipboard-container">
+        <div class="clipboard-section">
+            <h2>📱 iPhone → 🖥️ Linux</h2>
+            <textarea id="sendText" placeholder="Type or paste text here..."></textarea>
+            <button class="btn btn-primary" id="sendBtn">Send to Linux</button>
+        </div>
+        
+        <div class="clipboard-section">
+            <h2>🖥️ Linux → 📱 iPhone</h2>
+            <textarea id="receiveText" placeholder="Waiting for clipboard from Linux..." readonly></textarea>
+            <button class="btn btn-secondary" id="copyBtn">Copy to iPhone Clipboard</button>
+        </div>
+    </div>
+
+    <script src="/clipboard.js"></script>
+</body>
+</html>
