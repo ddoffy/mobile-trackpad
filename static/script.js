@@ -156,8 +156,9 @@ trackpad.addEventListener('touchend', (e) => {
             const absDy = Math.abs(twoFingerTotalDy);
             
             // Swipe detection: significant horizontal movement, minimal vertical
+            // macOS-style: swipe right = back, swipe left = forward
             if (absDx > SWIPE_THRESHOLD && absDy / absDx < SWIPE_ANGLE_THRESHOLD) {
-                const direction = twoFingerTotalDx > 0 ? 'right' : 'left';
+                const direction = twoFingerTotalDx > 0 ? 'left' : 'right';
                 sendEvent({ type: 'swipe', direction });
             }
             // Two-finger tap for right-click
