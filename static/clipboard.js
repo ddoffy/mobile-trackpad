@@ -95,7 +95,30 @@ async function copyHistoryItem(button) {
     const plainText = textarea.value;
     
     try {
-        await navigator.clipboard.writeText(plainText);
+        // Try modern API first
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            await navigator.clipboard.writeText(plainText);
+        } else {
+            // Fallback for non-HTTPS or older browsers
+            const tempTextarea = document.createElement('textarea');
+            tempTextarea.value = plainText;
+            tempTextarea.style.position = 'fixed';
+            tempTextarea.style.left = '-9999px';
+            tempTextarea.style.top = '0';
+            document.body.appendChild(tempTextarea);
+            tempTextarea.focus();
+            tempTextarea.select();
+            
+            try {
+                const successful = document.execCommand('copy');
+                if (!successful) {
+                    throw new Error('execCommand failed');
+                }
+            } finally {
+                document.body.removeChild(tempTextarea);
+            }
+        }
+        
         const originalText = button.textContent;
         button.textContent = '✓ Copied!';
         button.style.background = '#4CAF50';
