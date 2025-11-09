@@ -3,6 +3,8 @@ use futures::{StreamExt, SinkExt};
 use serde::{Deserialize, Serialize};
 use std::sync::{Arc, Mutex};
 use warp::{ws::Message, Filter};
+use tokio::time::{interval, Duration};
+use tokio::sync::broadcast;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type")]
@@ -23,6 +25,13 @@ enum TrackpadEvent {
     ArrowKey { key: String },
     #[serde(rename = "clipboard")]
     Clipboard { content: String },
+}
+
+#[derive(Debug, Clone, Serialize)]
+struct ClipboardItem {
+    content: String,
+    timestamp: u64,
+    source: String,
 }
 
 struct MouseController {
@@ -186,6 +195,7 @@ impl MouseController {
 async fn handle_websocket(
     ws: warp::ws::WebSocket,
     mouse_controller: Arc<MouseController>,
+    clipboard_tx: broadcast::Sender<ClipboardItem>,
 ) {
     let (mut ws_tx, mut ws_rx) = ws.split();
 
@@ -195,6 +205,28 @@ async fn handle_websocket(
     });
     let _ = ws_tx.send(Message::text(msg.to_string())).await;
 
+    // Subscribe to clipboard broadcasts
+    let mut clipboard_rx = clipboard_tx.subscribe();
+    let ws_tx = Arc::new(tokio::sync::Mutex::new(ws_tx));
+    let ws_tx_clone = ws_tx.clone();
+    
+    // Task to receive clipboard broadcasts and send to this client
+    tokio::spawn(async move {
+        while let Ok(item) = clipboard_rx.recv().await {
+            let msg = serde_json::json!({
+                "type": "clipboard_history",
+                "content": item.content,
+                "timestamp": item.timestamp,
+                "source": item.source
+            });
+            
+            let mut tx = ws_tx_clone.lock().await;
+            if tx.send(Message::text(msg.to_string())).await.is_err() {
+                break; // Connection closed
+            }
+        }
+    });
+
     while let Some(result) = ws_rx.next().await {
         match result {
             Ok(msg) => {
@@ -202,12 +234,16 @@ async fn handle_websocket(
                     if let Ok(event) = serde_json::from_str::<TrackpadEvent>(text) {
                         // Handle clipboard separately
                         if let TrackpadEvent::Clipboard { content } = &event {
-                            // Set Linux clipboard
-                            if let Ok(mut clipboard) = arboard::Clipboard::new() {
-                                if let Err(e) = clipboard.set_text(content.clone()) {
-                                    eprintln!("Error setting clipboard: {}", e);
-                                }
-                            }
+                            // Broadcast to all connected clients
+                            let item = ClipboardItem {
+                                content: content.clone(),
+                                timestamp: std::time::SystemTime::now()
+                                    .duration_since(std::time::UNIX_EPOCH)
+                                    .unwrap()
+                                    .as_secs(),
+                                source: "iPhone".to_string(),
+                            };
+                            let _ = clipboard_tx.send(item);
                         } else {
                             // Handle other events through mouse controller
                             if let Err(e) = mouse_controller.handle_event(event) {
@@ -235,6 +271,38 @@ async fn main() {
     );
     println!("✓ Mouse controller initialized (using evdev/uinput for Wayland)");
 
+    // Create broadcast channel for clipboard events
+    let (clipboard_tx, _) = broadcast::channel::<ClipboardItem>(100);
+    
+    // Spawn clipboard monitoring task
+    let clipboard_tx_monitor = clipboard_tx.clone();
+    tokio::spawn(async move {
+        let mut last_clipboard_content = String::new();
+        let mut poll_interval = interval(Duration::from_millis(1000));
+        
+        loop {
+            poll_interval.tick().await;
+            
+            if let Ok(mut clipboard) = arboard::Clipboard::new() {
+                if let Ok(content) = clipboard.get_text() {
+                    if content != last_clipboard_content && !content.is_empty() {
+                        last_clipboard_content = content.clone();
+                        
+                        let item = ClipboardItem {
+                            content,
+                            timestamp: std::time::SystemTime::now()
+                                .duration_since(std::time::UNIX_EPOCH)
+                                .unwrap()
+                                .as_secs(),
+                            source: "Linux".to_string(),
+                        };
+                        let _ = clipboard_tx_monitor.send(item);
+                    }
+                }
+            }
+        }
+    });
+
     let local_ip = local_ip_address::local_ip()
         .unwrap_or_else(|_| "0.0.0.0".parse().unwrap());
 
@@ -254,7 +322,8 @@ async fn main() {
         .and(warp::ws())
         .map(move |ws: warp::ws::Ws| {
             let mouse_controller = Arc::clone(&mouse_controller);
-            ws.on_upgrade(move |socket| handle_websocket(socket, mouse_controller))
+            let clipboard_tx = clipboard_tx.clone();
+            ws.on_upgrade(move |socket| handle_websocket(socket, mouse_controller, clipboard_tx))
         });
 
     let html_route = warp::path::end()

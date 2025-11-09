@@ -222,6 +222,13 @@ body {
     text-align: center;
 }
 
+.clipboard-info {
+    color: rgba(255, 255, 255, 0.7);
+    font-size: 14px;
+    text-align: center;
+    margin-bottom: 15px;
+}
+
 .clipboard-section textarea {
     width: 100%;
     min-height: 150px;
@@ -247,4 +254,56 @@ body {
 .btn-secondary {
     background: rgba(59, 130, 246, 0.6);
     width: 100%;
+}
+
+.btn-small {
+    padding: 8px 16px;
+    font-size: 14px;
+    width: auto;
+    margin-top: 10px;
+}
+
+/* History List */
+.history-list {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    max-height: 500px;
+    overflow-y: auto;
+}
+
+.history-item {
+    background: rgba(255, 255, 255, 0.15);
+    border-radius: 12px;
+    padding: 15px;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.history-header {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 10px;
+    color: rgba(255, 255, 255, 0.9);
+    font-size: 14px;
+}
+
+.history-source {
+    font-weight: 600;
+}
+
+.history-time {
+    color: rgba(255, 255, 255, 0.6);
+    font-size: 12px;
+}
+
+.history-content {
+    background: rgba(255, 255, 255, 0.9);
+    padding: 12px;
+    border-radius: 8px;
+    color: #1f2937;
+    font-size: 14px;
+    word-wrap: break-word;
+    white-space: pre-wrap;
+    max-height: 200px;
+    overflow-y: auto;
 }

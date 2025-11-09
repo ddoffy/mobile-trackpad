@@ -18,15 +18,15 @@
     
     <div class="clipboard-container">
         <div class="clipboard-section">
-            <h2>📱 iPhone → 🖥️ Linux</h2>
+            <h2>✏️ Send to All Sessions</h2>
             <textarea id="sendText" placeholder="Type or paste text here..."></textarea>
-            <button class="btn btn-primary" id="sendBtn">Send to Linux</button>
+            <button class="btn btn-primary" id="sendBtn">📤 Broadcast</button>
         </div>
         
         <div class="clipboard-section">
-            <h2>🖥️ Linux → 📱 iPhone</h2>
-            <textarea id="receiveText" placeholder="Waiting for clipboard from Linux..." readonly></textarea>
-            <button class="btn btn-secondary" id="copyBtn">Copy to iPhone Clipboard</button>
+            <h2>� Clipboard History</h2>
+            <div class="clipboard-info">All clipboard events from all connected sessions appear here</div>
+            <div id="historyList" class="history-list"></div>
         </div>
     </div>
 

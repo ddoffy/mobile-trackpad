@@ -1,9 +1,8 @@
 const ws = new WebSocket(`ws://${window.location.host}/ws`);
 const status = document.getElementById('status');
 const sendText = document.getElementById('sendText');
-const receiveText = document.getElementById('receiveText');
+const historyList = document.getElementById('historyList');
 const sendBtn = document.getElementById('sendBtn');
-const copyBtn = document.getElementById('copyBtn');
 
 ws.onopen = () => {
     status.textContent = '✓ Connected';
@@ -24,15 +23,51 @@ ws.onerror = (error) => {
 ws.onmessage = (event) => {
     try {
         const data = JSON.parse(event.data);
-        if (data.type === 'clipboard') {
-            receiveText.value = data.content;
-            // Show notification
-            showNotification('📋 Clipboard received from Linux!');
+        if (data.type === 'clipboard_history') {
+            addHistoryItem(data.content, data.timestamp, data.source);
         }
     } catch (e) {
         console.error('Error parsing message:', e);
     }
 };
+
+function addHistoryItem(content, timestamp, source) {
+    const item = document.createElement('div');
+    item.className = 'history-item';
+    
+    const date = new Date(timestamp * 1000);
+    const timeStr = date.toLocaleTimeString();
+    
+    const icon = source === 'Linux' ? '🖥️' : '📱';
+    
+    const escapedContent = escapeHtml(content);
+    
+    item.innerHTML = `
+        <div class="history-header">
+            <span class="history-source">${icon} ${source}</span>
+            <span class="history-time">${timeStr}</span>
+        </div>
+        <div class="history-content">${escapedContent}</div>
+        <button class="btn btn-small" data-content="${escapedContent}">📋 Copy</button>
+    `;
+    
+    const copyBtn = item.querySelector('.btn');
+    copyBtn.addEventListener('click', function() {
+        copyHistoryItem(this);
+    });
+    
+    historyList.insertBefore(item, historyList.firstChild);
+    
+    while (historyList.children.length > 50) {
+        historyList.removeChild(historyList.lastChild);
+    }
+}
+
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
 
 function sendClipboard() {
     const text = sendText.value;
@@ -46,33 +81,36 @@ function sendClipboard() {
             type: 'clipboard',
             content: text
         }));
-        showNotification('✅ Sent to Linux clipboard!', 'success');
+        showNotification('✅ Broadcasted to all sessions!', 'success');
         sendText.value = '';
     } else {
         showNotification('❌ Not connected to server', 'error');
     }
 }
 
-async function copyToClipboard() {
-    const text = receiveText.value;
-    if (!text.trim()) {
-        showNotification('⚠️ No text to copy', 'warning');
-        return;
-    }
+async function copyHistoryItem(button) {
+    const content = button.getAttribute('data-content');
+    const textarea = document.createElement('textarea');
+    textarea.innerHTML = content;
+    const plainText = textarea.value;
     
     try {
-        await navigator.clipboard.writeText(text);
-        showNotification('✅ Copied to iPhone clipboard!', 'success');
+        await navigator.clipboard.writeText(plainText);
+        const originalText = button.textContent;
+        button.textContent = '✓ Copied!';
+        button.style.background = '#4CAF50';
+        
+        setTimeout(() => {
+            button.textContent = originalText;
+            button.style.background = '';
+        }, 2000);
     } catch (err) {
-        // Fallback for older browsers
-        receiveText.select();
-        document.execCommand('copy');
-        showNotification('✅ Copied to clipboard!', 'success');
+        console.error('Failed to copy:', err);
+        showNotification('❌ Failed to copy to clipboard', 'error');
     }
 }
 
 function showNotification(message, type = 'info') {
-    // Create notification element
     const notif = document.createElement('div');
     notif.textContent = message;
     notif.style.cssText = `
@@ -101,11 +139,8 @@ function showNotification(message, type = 'info') {
     }, 2000);
 }
 
-// Event listeners
 sendBtn.addEventListener('click', sendClipboard);
-copyBtn.addEventListener('click', copyToClipboard);
 
-// Send on Enter (Ctrl+Enter for newline)
 sendText.addEventListener('keydown', (e) => {
     if (e.key === 'Enter' && !e.ctrlKey && !e.shiftKey) {
         e.preventDefault();
